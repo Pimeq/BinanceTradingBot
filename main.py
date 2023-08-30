@@ -150,40 +150,6 @@ def makeTrade(symbol, side, stop_loss_price=None):
         print(f"Error placing {side} order: {str(e)}")
 
 
-# def tradeBasedOnRsi(symbol):
-#     global openPositions
-#     print(openPositions)
-#     # Calculate the current RSI
-#     rsi = calculateRsi(symbol)
-#     print(Fore.BLUE+ Fore.BLUE+ "[TRADE INFO]:"+Fore.RESET+" Current RSI =", rsi)
-    
-#     if rsi is not None:
-#         for position in openPositions:
-#             if position['symbol'] == symbol:
-#                 if position['side'] == 'SELL' and rsi <= Config.RSI_LOWER_THRESHOLD:
-#                     makeTrade(symbol, side=Client.SIDE_BUY)
-#                     data, count = supabase.table('openPositions').delete().eq("symbol", symbol).execute()
-#                     openPositions.remove(position)
-#                     print(f"Closed short position for {symbol}")
-#                 elif position['side'] == 'BUY' and rsi >= Config.RSI_UPPER_THRESHOLD:
-#                     makeTrade(symbol, side=Client.SIDE_SELL)
-#                     data, count = supabase.table('openPositions').delete().eq("symbol", symbol).execute()
-#                     openPositions.remove(position)
-#                     print(f"Closed long position for {symbol}")
-        
-#         if symbol not in [position['symbol'] for position in openPositions]:
-#             if rsi <= Config.RSI_LOWER_THRESHOLD:
-#                 makeTrade(symbol, side=Client.SIDE_SELL)
-#                 data, count = supabase.table('openPositions').insert({'side': "SELL", 'rsiThreshold': rsi, "symbol": symbol}).execute()
-#                 print(data)
-#                 openPositions.append({'id': data[1][0]['id'], 'created_at': data[1][0]['created_at'], 'side': 'BUY', 'rsiThreshold': rsi, 'symbol': symbol})
-#                 print(f"Opened short position for {symbol}")
-#             elif rsi >= Config.RSI_UPPER_THRESHOLD:
-#                 makeTrade(symbol, side=Client.SIDE_BUY)
-#                 data, count = supabase.table('openPositions').insert({'side': "BUY", 'rsiThreshold': rsi, "symbol": symbol}).execute()
-#                 openPositions.append({'id': data[1][0]['id'], 'created_at': data[1][0]['created_at'], 'side': 'SELL', 'rsiThreshold': rsi, 'symbol': symbol})
-#                 print(f"Opened long position for {symbol}")
-
 def tradeBasedOnIndicators(symbol):
     global openPositions
     print(openPositions)
