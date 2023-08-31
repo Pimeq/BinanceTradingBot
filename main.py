@@ -17,15 +17,15 @@ load_dotenv()
 class Config:
 
     # RSI clamp values
-    RSI_LOWER_THRESHOLD = 30
-    RSI_UPPER_THRESHOLD = 70
+    RSI_LOWER_THRESHOLD = 50
+    RSI_UPPER_THRESHOLD = 50
 
     # Active token to trade
     ACTIVE_TOKEN = 'BTCUSDT'
 
-    KLINE_INTERVAL = Client.KLINE_INTERVAL_1HOUR
+    KLINE_INTERVAL = Client.KLINE_INTERVAL_1MINUTE
     #in seconds
-    REFRESH_INTERVAL = 3600
+    REFRESH_INTERVAL = 60
 
 
 webhook = DiscordWebhook(url=os.getenv('WEBHOOK_URL'))
@@ -211,7 +211,7 @@ def tradeBasedOnIndicators(symbol):
                     tradeInfo = client.futures_account_trades(symbol=symbol,orderId=ClosingTradeId)
                     calcProfit = (float(tradeInfo[0]['price']) - float(position['entryPrice'])) * 0.01
                     
-                    embed = DiscordEmbed(title=f"Trade Made!",color="#fc2003",description=f"calculated profit: {calcProfit}")
+                    embed = DiscordEmbed(title=f"Trade Made!",color="fc2003")
                     embed.add_embed_field(f'Closed short position for {symbol}',f'Calculated profit/loss: {calcProfit}')
                     embed.set_timestamp()
                     webhook.add_embed(embed)
@@ -231,7 +231,7 @@ def tradeBasedOnIndicators(symbol):
                     tradeInfo = client.futures_account_trades(symbol=symbol,orderId=ClosingTradeId)
                     calcProfit = (float(tradeInfo[0]['price']) - float(position['entryPrice'])) * 0.01
 
-                    embed = DiscordEmbed(title=f"Trade Made!",color="#49fc03",description=f"calculated profit: {calcProfit}")
+                    embed = DiscordEmbed(title=f"Trade Made!",color="49fc03")
                     embed.add_embed_field(f'Closed long position for',f'Calculated profit/loss: {calcProfit}')
                     embed.set_timestamp()
                     webhook.add_embed(embed)
