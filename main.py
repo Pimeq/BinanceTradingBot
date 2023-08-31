@@ -17,15 +17,15 @@ load_dotenv()
 class Config:
 
     # RSI clamp values
-    RSI_LOWER_THRESHOLD = 50
-    RSI_UPPER_THRESHOLD = 50
+    RSI_LOWER_THRESHOLD = 30
+    RSI_UPPER_THRESHOLD = 70
 
     # Active token to trade
     ACTIVE_TOKEN = 'BTCUSDT'
 
-    KLINE_INTERVAL = Client.KLINE_INTERVAL_1MINUTE
+    KLINE_INTERVAL = Client.KLINE_INTERVAL_1HOUR
     #in seconds
-    REFRESH_INTERVAL = 60
+    REFRESH_INTERVAL = 3600
 
 
 webhook = DiscordWebhook(url=os.getenv('WEBHOOK_URL'))
