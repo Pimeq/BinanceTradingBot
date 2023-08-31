@@ -10,6 +10,7 @@ from supabase import create_client, Client as supabaseClient
 from colorama import Fore
 import os
 from dotenv import load_dotenv
+from discord_webhook import DiscordWebhook,DiscordEmbed
 
 load_dotenv()
 
@@ -27,6 +28,7 @@ class Config:
     REFRESH_INTERVAL = 3600
 
 
+webhook = DiscordWebhook(url=os.getenv('WEBHOOK_URL'))
 app = FastAPI()
 
 apiKey = os.getenv('BINANCE_KEY')
@@ -150,6 +152,40 @@ def makeTrade(symbol, side, stop_loss_price=None):
         print(f"Error placing {side} order: {str(e)}")
 
 
+# def tradeBasedOnRsi(symbol):
+#     global openPositions
+#     print(openPositions)
+#     # Calculate the current RSI
+#     rsi = calculateRsi(symbol)
+#     print(Fore.BLUE+ Fore.BLUE+ "[TRADE INFO]:"+Fore.RESET+" Current RSI =", rsi)
+    
+#     if rsi is not None:
+#         for position in openPositions:
+#             if position['symbol'] == symbol:
+#                 if position['side'] == 'SELL' and rsi <= Config.RSI_LOWER_THRESHOLD:
+#                     makeTrade(symbol, side=Client.SIDE_BUY)
+#                     data, count = supabase.table('openPositions').delete().eq("symbol", symbol).execute()
+#                     openPositions.remove(position)
+#                     print(f"Closed short position for {symbol}")
+#                 elif position['side'] == 'BUY' and rsi >= Config.RSI_UPPER_THRESHOLD:
+#                     makeTrade(symbol, side=Client.SIDE_SELL)
+#                     data, count = supabase.table('openPositions').delete().eq("symbol", symbol).execute()
+#                     openPositions.remove(position)
+#                     print(f"Closed long position for {symbol}")
+        
+#         if symbol not in [position['symbol'] for position in openPositions]:
+#             if rsi <= Config.RSI_LOWER_THRESHOLD:
+#                 makeTrade(symbol, side=Client.SIDE_SELL)
+#                 data, count = supabase.table('openPositions').insert({'side': "SELL", 'rsiThreshold': rsi, "symbol": symbol}).execute()
+#                 print(data)
+#                 openPositions.append({'id': data[1][0]['id'], 'created_at': data[1][0]['created_at'], 'side': 'BUY', 'rsiThreshold': rsi, 'symbol': symbol})
+#                 print(f"Opened short position for {symbol}")
+#             elif rsi >= Config.RSI_UPPER_THRESHOLD:
+#                 makeTrade(symbol, side=Client.SIDE_BUY)
+#                 data, count = supabase.table('openPositions').insert({'side': "BUY", 'rsiThreshold': rsi, "symbol": symbol}).execute()
+#                 openPositions.append({'id': data[1][0]['id'], 'created_at': data[1][0]['created_at'], 'side': 'SELL', 'rsiThreshold': rsi, 'symbol': symbol})
+#                 print(f"Opened long position for {symbol}")
+
 def tradeBasedOnIndicators(symbol):
     global openPositions
     print(openPositions)
@@ -175,7 +211,12 @@ def tradeBasedOnIndicators(symbol):
                     tradeInfo = client.futures_account_trades(symbol=symbol,orderId=ClosingTradeId)
                     calcProfit = (float(tradeInfo[0]['price']) - float(position['entryPrice'])) * 0.01
                     
-                    
+                    embed = DiscordEmbed(title=f"Trade Made!",color="#fc2003",description=f"calculated profit: {calcProfit}")
+                    embed.add_embed_field(f'Closed short position for {symbol}',f'Calculated profit/loss: {calcProfit}')
+                    embed.set_timestamp()
+                    webhook.add_embed(embed)
+                    webhook.execute()
+
                     supabase.table('closedPositions').insert({'profit': calcProfit,'trade_id':position['id'],'direction': 'SHORT'}).execute()
                     supabase.table('openPositions').delete().eq('id',position['id']).execute()
                     
@@ -189,6 +230,12 @@ def tradeBasedOnIndicators(symbol):
                     ClosingTradeId = makeTrade(symbol, side=Client.SIDE_SELL)
                     tradeInfo = client.futures_account_trades(symbol=symbol,orderId=ClosingTradeId)
                     calcProfit = (float(tradeInfo[0]['price']) - float(position['entryPrice'])) * 0.01
+
+                    embed = DiscordEmbed(title=f"Trade Made!",color="#49fc03",description=f"calculated profit: {calcProfit}")
+                    embed.add_embed_field(f'Closed long position for',f'Calculated profit/loss: {calcProfit}')
+                    embed.set_timestamp()
+                    webhook.add_embed(embed)
+                    webhook.execute()
 
                     supabase.table('closedPositions').insert({'profit': calcProfit,'trade_id':position['id'],'direction': 'SHORT'}).execute()
                     supabase.table('openPositions').delete().eq('id', position['id']).execute()
