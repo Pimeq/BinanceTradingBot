@@ -173,7 +173,7 @@ def tradeBasedOnIndicators(symbol):
                     
                     ClosingTradeId = makeTrade(symbol, side=Client.SIDE_BUY)
                     tradeInfo = client.futures_account_trades(symbol=symbol,orderId=ClosingTradeId)
-                    calcProfit = (float(tradeInfo[0]['price']) - float(position['entryPrice'])) * 0.01
+                    calcProfit = (float(position['entryPrice']) - float(tradeInfo[0]['price'])) * 0.01
                     
                     
                     supabase.table('closedPositions').insert({'profit': calcProfit,'trade_id':position['id'],'direction': 'SHORT'}).execute()
@@ -188,7 +188,7 @@ def tradeBasedOnIndicators(symbol):
                     
                     ClosingTradeId = makeTrade(symbol, side=Client.SIDE_SELL)
                     tradeInfo = client.futures_account_trades(symbol=symbol,orderId=ClosingTradeId)
-                    calcProfit = (float(tradeInfo[0]['price']) - float(position['entryPrice'])) * 0.01
+                    calcProfit = (float(position['entryPrice']) - float(tradeInfo[0]['price'])) * 0.01
 
                     supabase.table('closedPositions').insert({'profit': calcProfit,'trade_id':position['id'],'direction': 'SHORT'}).execute()
                     supabase.table('openPositions').delete().eq('id', position['id']).execute()
