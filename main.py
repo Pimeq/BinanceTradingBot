@@ -49,10 +49,17 @@ cryptoSymbol = 'BTCUSDT'
 botActive = False  # Flag to control bot activation
 lastCandleTimestamp = None
 @app.post("/toggleBot")
-async def toggle_bot(status: bool):
+async def toggleBot(status: bool):
     global botActive
     botActive = status
     return {"message": f"Bot is now {'active' if botActive else 'inactive'}"}
+
+
+@app.post("/checkStatus")
+async def checkStatus():
+    global botActive
+    return {"status": botActive}
+
 
 
 @app.get("/calculateRsi")
