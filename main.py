@@ -46,7 +46,7 @@ client.timestamp_offset = client.get_server_time().get('serverTime') - time.time
 cryptoSymbol = 'BTCUSDT'
 
 
-botActive = False  # Flag to control bot activation
+botActive = True  # Flag to control bot activation
 lastCandleTimestamp = None
 @app.post("/toggleBot")
 async def toggleBot(status: bool):
@@ -277,23 +277,26 @@ def backgroundTask():
     openPositions = supabase.table('openPositions').select('*').eq('symbol',cryptoSymbol).execute().data
     print(openPositions)
     while True:
-        # Replace with the cryptocurrency symbol you want to trade
-        print("[INFO]: Running bg task...")
-        # Fetch the latest candle's timestamp
-        klines = client.futures_klines(symbol=cryptoSymbol, interval=Config.KLINE_INTERVAL, limit=1)
-        latestCandleTimestamp = klines[0][0]
-        # Check if a new candle has appeared
-        print(lastCandleTimestamp,latestCandleTimestamp)
-        if lastCandleTimestamp is None or latestCandleTimestamp > lastCandleTimestamp:
-            lastCandleTimestamp = latestCandleTimestamp
-            print(Fore.BLUE+ "[TRADE INFO]:"+Fore.RESET+" Launching trading function")
-            #tradeBasedOnRsi(cryptoSymbol)
-            tradeBasedOnIndicators(cryptoSymbol)
+        if(not botActive):
+            time.sleep(100)
+        else:
+            # Replace with the cryptocurrency symbol you want to trade
+            print("[INFO]: Running bg task...")
+            # Fetch the latest candle's timestamp
+            klines = client.futures_klines(symbol=cryptoSymbol, interval=Config.KLINE_INTERVAL, limit=1)
+            latestCandleTimestamp = klines[0][0]
+            # Check if a new candle has appeared
+            print(lastCandleTimestamp,latestCandleTimestamp)
+            if lastCandleTimestamp is None or latestCandleTimestamp > lastCandleTimestamp:
+                lastCandleTimestamp = latestCandleTimestamp
+                print(Fore.BLUE+ "[TRADE INFO]:"+Fore.RESET+" Launching trading function")
+                #tradeBasedOnRsi(cryptoSymbol)
+                tradeBasedOnIndicators(cryptoSymbol)
 
-        # Wait for an hour before the next check
-        currentTime = (datetime.now() + timedelta(seconds=Config.REFRESH_INTERVAL)).strftime("%H:%M:%S")
-        print("[UPDATE INFO]: Next update - "+str(currentTime))
-        time.sleep(Config.REFRESH_INTERVAL)
+            # Wait for an hour before the next check
+            currentTime = (datetime.now() + timedelta(seconds=Config.REFRESH_INTERVAL)).strftime("%H:%M:%S")
+            print("[UPDATE INFO]: Next update - "+str(currentTime))
+            time.sleep(Config.REFRESH_INTERVAL)
 
 
 if __name__ == '__main__':
