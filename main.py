@@ -56,7 +56,7 @@ async def toggleBot(status: bool):
 
 
 @app.post("/checkStatus")
-async def checkStatus():
+async def checkStatusEndpoint():
     global botActive
     return {"status": botActive}
 
@@ -101,13 +101,6 @@ def calculateMacd(symbol):
         print(f"Error calculating MACD: {str(e)}")
         return None
 
-
-
-
-@app.get("/makeTrade")
-async def makeTradeEndpoint(symbol: str, side: str):
-    makeTrade(symbol, side)
-    return {"message": f"Placed {side} order for {symbol}"}
 
 
 def calculateRsi(symbol):
