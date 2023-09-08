@@ -156,41 +156,6 @@ def makeTrade(symbol, side, stop_loss_price=None):
     except Exception as e:
         print(f"Error placing {side} order: {str(e)}")
 
-
-# def tradeBasedOnRsi(symbol):
-#     global openPositions
-#     print(openPositions)
-#     # Calculate the current RSI
-#     rsi = calculateRsi(symbol)
-#     print(Fore.BLUE+ Fore.BLUE+ "[TRADE INFO]:"+Fore.RESET+" Current RSI =", rsi)
-    
-#     if rsi is not None:
-#         for position in openPositions:
-#             if position['symbol'] == symbol:
-#                 if position['side'] == 'SELL' and rsi <= Config.RSI_LOWER_THRESHOLD:
-#                     makeTrade(symbol, side=Client.SIDE_BUY)
-#                     data, count = supabase.table('openPositions').delete().eq("symbol", symbol).execute()
-#                     openPositions.remove(position)
-#                     print(f"Closed short position for {symbol}")
-#                 elif position['side'] == 'BUY' and rsi >= Config.RSI_UPPER_THRESHOLD:
-#                     makeTrade(symbol, side=Client.SIDE_SELL)
-#                     data, count = supabase.table('openPositions').delete().eq("symbol", symbol).execute()
-#                     openPositions.remove(position)
-#                     print(f"Closed long position for {symbol}")
-        
-#         if symbol not in [position['symbol'] for position in openPositions]:
-#             if rsi <= Config.RSI_LOWER_THRESHOLD:
-#                 makeTrade(symbol, side=Client.SIDE_SELL)
-#                 data, count = supabase.table('openPositions').insert({'side': "SELL", 'rsiThreshold': rsi, "symbol": symbol}).execute()
-#                 print(data)
-#                 openPositions.append({'id': data[1][0]['id'], 'created_at': data[1][0]['created_at'], 'side': 'BUY', 'rsiThreshold': rsi, 'symbol': symbol})
-#                 print(f"Opened short position for {symbol}")
-#             elif rsi >= Config.RSI_UPPER_THRESHOLD:
-#                 makeTrade(symbol, side=Client.SIDE_BUY)
-#                 data, count = supabase.table('openPositions').insert({'side': "BUY", 'rsiThreshold': rsi, "symbol": symbol}).execute()
-#                 openPositions.append({'id': data[1][0]['id'], 'created_at': data[1][0]['created_at'], 'side': 'SELL', 'rsiThreshold': rsi, 'symbol': symbol})
-#                 print(f"Opened long position for {symbol}")
-
 def tradeBasedOnIndicators(symbol):
     global openPositions
     global activeUsers
@@ -270,7 +235,12 @@ def tradeBasedOnIndicators(symbol):
                     print(Fore.LIGHTBLUE_EX+ "[TRADE INFO]:"+Fore.RESET+ f"Opened long position for {symbol}")
 
 
+def fetchUserConfig(userId):
+    return supabase.table('configs').select('*').eq('user_id',userId).execute().data
+
+
 def backgroundTask():
+    print(Fore.CYAN+ "[USER INFO]: Got the config"+Fore.RESET+fetchUserConfig("c69cdbfa-4261-4d53-932d-eb7b3327ca63"))
     global lastCandleTimestamp
     global cryptoSymbol
     global openPositions
