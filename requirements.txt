@@ -5,4 +5,4 @@ supabase
 discord-webhook
 pandas-ta
 python-binance
-dotenv
+python-dotenv
