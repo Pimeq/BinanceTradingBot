@@ -18,20 +18,20 @@ load_dotenv()
 class Config:
 
     # RSI clamp values
-    RSI_LOWER_THRESHOLD = 30
-    RSI_UPPER_THRESHOLD = 70
+    RSI_LOWER_THRESHOLD = 90
+    RSI_UPPER_THRESHOLD = 10
 
     # Active token to trade
     ACTIVE_TOKEN = 'BTCUSDT'
 
-    KLINE_INTERVAL = Client.KLINE_INTERVAL_1HOUR
+    KLINE_INTERVAL = Client.KLINE_INTERVAL_1MINUTE
     #in seconds
-    REFRESH_INTERVAL = 3600
+    REFRESH_INTERVAL = 60
 
     USER_ID = 1
 
 
-activeUsers = []
+activeConfigs = []
 
 webhook = DiscordWebhook(url=os.getenv('WEBHOOK_URL'))
 app = FastAPI()
@@ -156,9 +156,9 @@ def makeTrade(symbol, side, stop_loss_price=None):
     except Exception as e:
         print(f"Error placing {side} order: {str(e)}")
 
-def tradeBasedOnIndicators(symbol):
+def tradeBasedOnIndicators(symbol,activeUserId):
     global openPositions
-    global activeUsers
+    global activeConfigs
     print(openPositions)
     # Calculate the current RSI and MACD
     rsi = calculateRsi(symbol)
@@ -170,69 +170,68 @@ def tradeBasedOnIndicators(symbol):
         rsi_value = rsi
         macd_value = macd_info['macd']
         signal_line_value = macd_info['signal_line']
-
-        for user in activeUsers:    
-            for position in openPositions:
-                if position['symbol'] == symbol and position['user_id'] == user['id']:
-                    if (
-                        (position['side'] == 'SELL' and rsi_value <= Config.RSI_LOWER_THRESHOLD)
-                        or (position['side'] == 'SELL' and macd_value > signal_line_value)
-                    ):
-                        
-                        ClosingTradeId = makeTrade(symbol, side=Client.SIDE_BUY)
-                        tradeInfo = client.futures_account_trades(symbol=symbol,orderId=ClosingTradeId)
-                        calcProfit = (float(position['entryPrice']) - float(tradeInfo[0]['price'])) * 0.01
-                        
-                        embed = DiscordEmbed(title=f"Trade Made!",color="fc2003")
-                        embed.add_embed_field(f'Closed short position for {symbol}',f'Calculated profit/loss: {calcProfit}')
-                        embed.set_timestamp()
-                        webhook.add_embed(embed)
-                        webhook.execute()
-
-                        supabase.table('closedPositions').insert({'profit': calcProfit,'trade_id':position['id'],'direction': 'SHORT','user_id': position['user_id']}).execute()
-                        supabase.table('openPositions').delete().eq('id',position['id']).execute()
-                        
-                        openPositions.remove(position)
-                        
-                        print(Fore.LIGHTRED_EX+ "[TRADE INFO]:"+Fore.RESET+ f"Closed short position for {symbol} with ID: {position['id']}")
-
-                    elif ((position['side'] == 'BUY' and rsi_value >= Config.RSI_UPPER_THRESHOLD)
-                        or (position['side'] == 'BUY' and macd_value < signal_line_value)):
-                        
-                        ClosingTradeId = makeTrade(symbol, side=Client.SIDE_SELL)
-                        tradeInfo = client.futures_account_trades(symbol=symbol,orderId=ClosingTradeId)
-                        calcProfit = (float(position['entryPrice']) - float(tradeInfo[0]['price'])) * 0.01
-
-                        embed = DiscordEmbed(title=f"Trade Made!",color="49fc03")
-                        embed.add_embed_field(f'Closed long position for',f'Calculated profit/loss: {calcProfit}')
-                        embed.set_timestamp()
-                        webhook.add_embed(embed)
-                        webhook.execute()
-
-                        supabase.table('closedPositions').insert({'profit': calcProfit,'trade_id':position['id'],'direction': 'SHORT','user_id': position['user_id']}).execute()
-                        supabase.table('openPositions').delete().eq('id', position['id']).execute()
-                        
-                        openPositions.remove(position)
-                        
-                        print(Fore.LIGHTRED_EX+ "[TRADE INFO]:"+Fore.RESET+ f"Closed long position for {symbol} with ID: {position['id']}")
-            
-            if symbol not in [position['symbol'] for position in openPositions]:
-                if rsi_value <= Config.RSI_LOWER_THRESHOLD and macd_value < signal_line_value:
-                    tradeID = makeTrade(symbol, side=Client.SIDE_SELL)
-                    tradeInfo = client.futures_account_trades(symbol=symbol,orderId=tradeID)
-
-                    data,count = supabase.table('openPositions').insert({'side': "SELL", 'rsiThreshold': rsi_value, 'macdThreshold': macd_value, "symbol": symbol, 'entryPrice':tradeInfo[0]['price'],'user_id': position['user_id']}).execute()
-                    openPositions.append({'id': data[1][0]['id'], 'created_at': data[1][0]['created_at'], 'side': 'SELL', 'rsiThreshold': rsi_value, 'macdThreshold': macd_value, 'symbol': symbol,'entryPrice': tradeInfo[0]['price'],'user_id': position['user_id']})
+  
+        for position in openPositions:
+            if position['symbol'] == symbol and position['user_id'] == activeUserId:
+                if (
+                    (position['side'] == 'SELL' and rsi_value <= Config.RSI_LOWER_THRESHOLD)
+                    or (position['side'] == 'SELL' and macd_value > signal_line_value)
+                ):
                     
-                    print(Fore.LIGHTBLUE_EX+ "[TRADE INFO]:"+Fore.RESET+ f"Opened short position for {symbol}")
-                elif rsi_value >= Config.RSI_UPPER_THRESHOLD and macd_value > signal_line_value:
-                    tradeID = makeTrade(symbol, side=Client.SIDE_BUY)
-                    tradeInfo = client.futures_account_trades(symbol=symbol,orderId=tradeID)
+                    ClosingTradeId = makeTrade(symbol, side=Client.SIDE_BUY)
+                    tradeInfo = client.futures_account_trades(symbol=symbol,orderId=ClosingTradeId)
+                    calcProfit = (float(position['entryPrice']) - float(tradeInfo[0]['price'])) * 0.01
                     
-                    data,count = supabase.table('openPositions').insert({'side': "BUY", 'rsiThreshold': rsi_value, 'macdThreshold': macd_value, "symbol": symbol,'entryPrice': tradeInfo[0]['price'],'user_id': position['user_id']}).execute()
-                    openPositions.append({'id': data[1][0]['id'], 'created_at': data[1][0]['created_at'], 'side': 'BUY', 'rsiThreshold': rsi_value, 'macdThreshold': macd_value, 'symbol': symbol,'entryPrice': tradeInfo[0]['price'],'user_id': position['user_id']})
+                    embed = DiscordEmbed(title=f"Trade Made!",color="fc2003")
+                    embed.add_embed_field(f'Closed short position for {symbol}',f'Calculated profit/loss: {calcProfit}')
+                    embed.set_timestamp()
+                    webhook.add_embed(embed)
+                    webhook.execute()
+
+                    supabase.table('closedPositions').insert({'profit': calcProfit,'trade_id':position['id'],'direction': 'SHORT','user_id': position['user_id']}).execute()
+                    supabase.table('openPositions').delete().eq('id',position['id']).execute()
                     
-                    print(Fore.LIGHTBLUE_EX+ "[TRADE INFO]:"+Fore.RESET+ f"Opened long position for {symbol}")
+                    openPositions.remove(position)
+                    
+                    print(Fore.LIGHTRED_EX+ "[TRADE INFO]:"+Fore.RESET+ f"Closed short position for {symbol} with ID: {position['id']}")
+
+                elif ((position['side'] == 'BUY' and rsi_value >= Config.RSI_UPPER_THRESHOLD)
+                    or (position['side'] == 'BUY' and macd_value < signal_line_value)):
+                    
+                    ClosingTradeId = makeTrade(symbol, side=Client.SIDE_SELL)
+                    tradeInfo = client.futures_account_trades(symbol=symbol,orderId=ClosingTradeId)
+                    calcProfit = (float(position['entryPrice']) - float(tradeInfo[0]['price'])) * 0.01
+
+                    embed = DiscordEmbed(title=f"Trade Made!",color="49fc03")
+                    embed.add_embed_field(f'Closed long position for',f'Calculated profit/loss: {calcProfit}')
+                    embed.set_timestamp()
+                    webhook.add_embed(embed)
+                    webhook.execute()
+
+                    supabase.table('closedPositions').insert({'profit': calcProfit,'trade_id':position['id'],'direction': 'SHORT','user_id': position['user_id']}).execute()
+                    supabase.table('openPositions').delete().eq('id', position['id']).execute()
+                    
+                    openPositions.remove(position)
+                    
+                    print(Fore.LIGHTRED_EX+ "[TRADE INFO]:"+Fore.RESET+ f"Closed long position for {symbol} with ID: {position['id']}")
+        
+        if symbol not in [position['symbol'] for position in openPositions]:
+            if rsi_value <= Config.RSI_LOWER_THRESHOLD and macd_value < signal_line_value:
+                tradeID = makeTrade(symbol, side=Client.SIDE_SELL)
+                tradeInfo = client.futures_account_trades(symbol=symbol,orderId=tradeID)
+
+                data,count = supabase.table('openPositions').insert({'side': "SELL", 'rsiThreshold': rsi_value, 'macdThreshold': macd_value, "symbol": symbol, 'entryPrice':tradeInfo[0]['price'],'user_id': activeUserId}).execute()
+                openPositions.append({'id': data[1][0]['id'], 'created_at': data[1][0]['created_at'], 'side': 'SELL', 'rsiThreshold': rsi_value, 'macdThreshold': macd_value, 'symbol': symbol,'entryPrice': tradeInfo[0]['price'],'user_id': activeUserId})
+                
+                print(Fore.LIGHTBLUE_EX+ "[TRADE INFO]:"+Fore.RESET+ f"Opened short position for {symbol}")
+            elif rsi_value >= Config.RSI_UPPER_THRESHOLD and macd_value > signal_line_value:
+                tradeID = makeTrade(symbol, side=Client.SIDE_BUY)
+                tradeInfo = client.futures_account_trades(symbol=symbol,orderId=tradeID)
+                
+                data,count = supabase.table('openPositions').insert({'side': "BUY", 'rsiThreshold': rsi_value, 'macdThreshold': macd_value, "symbol": symbol,'entryPrice': tradeInfo[0]['price'],'user_id': activeUserId}).execute()
+                openPositions.append({'id': data[1][0]['id'], 'created_at': data[1][0]['created_at'], 'side': 'BUY', 'rsiThreshold': rsi_value, 'macdThreshold': macd_value, 'symbol': symbol,'entryPrice': tradeInfo[0]['price'],'user_id': activeUserId})
+                
+                print(Fore.LIGHTBLUE_EX+ "[TRADE INFO]:"+Fore.RESET+ f"Opened long position for {symbol}")
 
 
 def fetchUserConfig(userId):
@@ -240,30 +239,33 @@ def fetchUserConfig(userId):
 
 
 def backgroundTask():
-    print(Fore.CYAN+ "[USER INFO]: Got the config"+Fore.RESET+fetchUserConfig("c69cdbfa-4261-4d53-932d-eb7b3327ca63"))
+    print(Fore.CYAN+ "[USER INFO]: Got the config"+Fore.RESET+str(fetchUserConfig("c69cdbfa-4261-4d53-932d-eb7b3327ca63")))
     global lastCandleTimestamp
     global cryptoSymbol
     global openPositions
-    global activeUsers
-    openPositions = supabase.table('openPositions').select('*').eq('symbol',cryptoSymbol).execute().data
-    activeUsers = supabase.table('activeUsers').select('*').execute().data
-    print(openPositions)
+    global activeConfigs
+    activeConfigs = supabase.table('configs').select('*').execute().data
+    print(activeConfigs)
     while True:
         if(not botActive):
             time.sleep(100)
         else:
-            # Replace with the cryptocurrency symbol you want to trade
-            print("[INFO]: Running bg task...")
-            # Fetch the latest candle's timestamp
-            klines = client.futures_klines(symbol=cryptoSymbol, interval=Config.KLINE_INTERVAL, limit=1)
-            latestCandleTimestamp = klines[0][0]
-            # Check if a new candle has appeared
-            print(lastCandleTimestamp,latestCandleTimestamp)
-            if lastCandleTimestamp is None or latestCandleTimestamp > lastCandleTimestamp:
-                lastCandleTimestamp = latestCandleTimestamp
-                print(Fore.BLUE+ "[TRADE INFO]:"+Fore.RESET+" Launching trading function")
-                #tradeBasedOnRsi(cryptoSymbol)
-                tradeBasedOnIndicators(cryptoSymbol)
+            for user in activeConfigs:
+                for cryptoSymbol in user['symbols']:
+                    openPositions = supabase.table('openPositions').select('*').eq('symbol',cryptoSymbol).eq('user_id',user['user_id']).execute().data
+                    print("OPEN POS: ",str(openPositions))
+                    # Replace with the cryptocurrency symbol you want to trade
+                    print("[INFO]: Running bg task...")
+                    # Fetch the latest candle's timestamp
+                    klines = client.futures_klines(symbol=cryptoSymbol, interval=Config.KLINE_INTERVAL, limit=1)
+                    latestCandleTimestamp = klines[0][0]
+                    # Check if a new candle has appeared
+                    print(lastCandleTimestamp,latestCandleTimestamp)
+                    if lastCandleTimestamp is None or latestCandleTimestamp > lastCandleTimestamp:
+                        lastCandleTimestamp = latestCandleTimestamp
+                        print(Fore.BLUE+ "[TRADE INFO]:"+Fore.RESET+" Launching trading function")
+                        #tradeBasedOnRsi(cryptoSymbol)
+                        tradeBasedOnIndicators(cryptoSymbol,user['user_id'])
 
             # Wait for an hour before the next check
             currentTime = (datetime.now() + timedelta(seconds=Config.REFRESH_INTERVAL)).strftime("%H:%M:%S")
