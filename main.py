@@ -32,6 +32,7 @@ class Config:
 
 
 activeConfigs = []
+activeUsers = {}
 
 webhook = DiscordWebhook(url=os.getenv('WEBHOOK_URL'))
 app = FastAPI()
@@ -44,10 +45,10 @@ supabaseKEY : str = os.getenv('SUPABASE_KEY')
 
 supabase: supabaseClient = create_client(supabaseURL, supabaseKEY)
 
-client = Client(apiKey, apiSecret,testnet=True)
-client.API_URL = 'https://testnet.binance.vision/api'
+#client = Client(apiKey, apiSecret,testnet=True)
+#client.API_URL = 'https://testnet.binance.vision/api'
 openPositions = {}
-client.timestamp_offset = client.get_server_time().get('serverTime') - time.time()*1000
+#client.timestamp_offset = client.get_server_time().get('serverTime') - time.time()*1000
 cryptoSymbol = 'BTCUSDT'
 
 
@@ -83,7 +84,7 @@ async def calculateMacdEndpoint(symbol: str):
     else:
         return {"error": "Error calculating MACD"}
 
-def calculateMacd(symbol):
+def calculateMacd(symbol,client):
     try:
         klines = client.futures_klines(symbol=symbol, interval=Client.KLINE_INTERVAL_1HOUR)
         close_prices = [float(kline[4]) for kline in klines]
@@ -107,8 +108,16 @@ def calculateMacd(symbol):
         return None
 
 
+def initUserList():
+    for user in activeConfigs:
+        newClient = Client(apiKey, apiSecret,testnet=True)
+        newClient.API_URL = 'https://testnet.binance.vision/api'
+        newClient.timestamp_offset = newClient.get_server_time().get('serverTime') - time.time()*1000
+        activeUsers[user['user_id']] = newClient
+    print(Fore.GREEN,"[SUCCESS]:",Fore.RESET," Initialized user list")
 
-def calculateRsi(symbol):
+
+def calculateRsi(symbol,client):
     try:
         klines = client.futures_klines(symbol=symbol, interval=Client.KLINE_INTERVAL_1HOUR)
 
@@ -130,7 +139,7 @@ def calculateRsi(symbol):
         return None
 
 
-def makeTrade(symbol, side, stop_loss_price=None):
+def makeTrade(symbol, side,client, stop_loss_price=None):
     try:
         if stop_loss_price:
             # Place a stop-loss limit order
@@ -156,13 +165,13 @@ def makeTrade(symbol, side, stop_loss_price=None):
     except Exception as e:
         print(f"Error placing {side} order: {str(e)}")
 
-def tradeBasedOnIndicators(symbol,activeUserId):
+def tradeBasedOnIndicators(symbol,activeUserId,client):
     global openPositions
     global activeConfigs
     print(openPositions)
     # Calculate the current RSI and MACD
-    rsi = calculateRsi(symbol)
-    macd_info = calculateMacd(symbol)
+    rsi = calculateRsi(symbol,client=client)
+    macd_info = calculateMacd(symbol,client=client)
     print(Fore.BLUE+ "[TRADE INFO]:"+Fore.RESET+" Current RSI =", rsi)
     print(Fore.BLUE+ "[TRADE INFO]:"+Fore.RESET+" Current MACD =", macd_info['macd'])
     
@@ -178,7 +187,7 @@ def tradeBasedOnIndicators(symbol,activeUserId):
                     or (position['side'] == 'SELL' and macd_value > signal_line_value)
                 ):
                     
-                    ClosingTradeId = makeTrade(symbol, side=Client.SIDE_BUY)
+                    ClosingTradeId = makeTrade(symbol, side=Client.SIDE_BUY,client=client)
                     tradeInfo = client.futures_account_trades(symbol=symbol,orderId=ClosingTradeId)
                     calcProfit = (float(position['entryPrice']) - float(tradeInfo[0]['price'])) * 0.01
                     
@@ -198,7 +207,7 @@ def tradeBasedOnIndicators(symbol,activeUserId):
                 elif ((position['side'] == 'BUY' and rsi_value >= Config.RSI_UPPER_THRESHOLD)
                     or (position['side'] == 'BUY' and macd_value < signal_line_value)):
                     
-                    ClosingTradeId = makeTrade(symbol, side=Client.SIDE_SELL)
+                    ClosingTradeId = makeTrade(symbol, side=Client.SIDE_SELL,client=client)
                     tradeInfo = client.futures_account_trades(symbol=symbol,orderId=ClosingTradeId)
                     calcProfit = (float(position['entryPrice']) - float(tradeInfo[0]['price'])) * 0.01
 
@@ -217,7 +226,7 @@ def tradeBasedOnIndicators(symbol,activeUserId):
         
         if symbol not in [position['symbol'] for position in openPositions]:
             if rsi_value <= Config.RSI_LOWER_THRESHOLD and macd_value < signal_line_value:
-                tradeID = makeTrade(symbol, side=Client.SIDE_SELL)
+                tradeID = makeTrade(symbol, side=Client.SIDE_SELL,client=client)
                 tradeInfo = client.futures_account_trades(symbol=symbol,orderId=tradeID)
 
                 data,count = supabase.table('openPositions').insert({'side': "SELL", 'rsiThreshold': rsi_value, 'macdThreshold': macd_value, "symbol": symbol, 'entryPrice':tradeInfo[0]['price'],'user_id': activeUserId}).execute()
@@ -225,7 +234,7 @@ def tradeBasedOnIndicators(symbol,activeUserId):
                 
                 print(Fore.LIGHTBLUE_EX+ "[TRADE INFO]:"+Fore.RESET+ f"Opened short position for {symbol}")
             elif rsi_value >= Config.RSI_UPPER_THRESHOLD and macd_value > signal_line_value:
-                tradeID = makeTrade(symbol, side=Client.SIDE_BUY)
+                tradeID = makeTrade(symbol, side=Client.SIDE_BUY,client=client)
                 tradeInfo = client.futures_account_trades(symbol=symbol,orderId=tradeID)
                 
                 data,count = supabase.table('openPositions').insert({'side': "BUY", 'rsiThreshold': rsi_value, 'macdThreshold': macd_value, "symbol": symbol,'entryPrice': tradeInfo[0]['price'],'user_id': activeUserId}).execute()
@@ -245,12 +254,14 @@ def backgroundTask():
     global openPositions
     global activeConfigs
     activeConfigs = supabase.table('configs').select('*').execute().data
+    initUserList()
     print(activeConfigs)
     while True:
         if(not botActive):
             time.sleep(100)
         else:
             for user in activeConfigs:
+                client = activeUsers[user['user_id']]
                 for cryptoSymbol in user['symbols']:
                     openPositions = supabase.table('openPositions').select('*').eq('symbol',cryptoSymbol).eq('user_id',user['user_id']).execute().data
                     print("OPEN POS: ",str(openPositions))
@@ -265,7 +276,7 @@ def backgroundTask():
                         lastCandleTimestamp = latestCandleTimestamp
                         print(Fore.BLUE+ "[TRADE INFO]:"+Fore.RESET+" Launching trading function")
                         #tradeBasedOnRsi(cryptoSymbol)
-                        tradeBasedOnIndicators(cryptoSymbol,user['user_id'])
+                        tradeBasedOnIndicators(cryptoSymbol,user['user_id'],client=activeUsers[user['user_id']])
 
             # Wait for an hour before the next check
             currentTime = (datetime.now() + timedelta(seconds=Config.REFRESH_INTERVAL)).strftime("%H:%M:%S")
