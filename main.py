@@ -212,7 +212,7 @@ def tradeBasedOnIndicators(symbol,activeUserId,client):
                     calcProfit = (float(position['entryPrice']) - float(tradeInfo[0]['price'])) * 0.01
 
                     embed = DiscordEmbed(title=f"Trade Made!",color="49fc03")
-                    embed.add_embed_field(f'Closed long position for',f'Calculated profit/loss: {calcProfit}')
+                    embed.add_embed_field(f'Closed long position for',f'Calculated profit/loss: {round(calcProfit,2)}')
                     embed.set_timestamp()
                     webhook.add_embed(embed)
                     webhook.execute()
